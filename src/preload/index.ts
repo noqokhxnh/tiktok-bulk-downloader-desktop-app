@@ -22,6 +22,9 @@ const api: IpcApi = {
   },
   downloadFile: (options) => {
     return ipcRenderer.invoke(IPC_CHANNELS.DOWNLOAD_FILE, options)
+  },
+  getDefaultDownloadPath: () => {
+    return ipcRenderer.invoke(IPC_CHANNELS.GET_DEFAULT_DOWNLOAD_PATH)
   }
 }
 

@@ -240,10 +240,12 @@ const BulkDownloader = () => {
     }
   }
 
-  const handleSelectFolder = async () => {
-    const path = await window.api.selectFolder()
-    if (path) setFolderPath(path)
-  }
+  // Fetch default path on mount
+  useState(() => {
+    window.api.getDefaultDownloadPath().then((path) => {
+      if (path) setFolderPath(path)
+    })
+  })
 
   // Download Logic
   const sanitizeFilename = (name: string) => {
@@ -265,34 +267,46 @@ const BulkDownloader = () => {
   }
 
   const handleDownload = async () => {
-    const selectedIndices = Object.keys(rowSelection)
-    if (selectedIndices.length === 0) {
+    // Get sorted and selected rows
+    const sortedRows = table.getSortedRowModel().rows
+    const selectedRows = sortedRows.filter((row) => row.getIsSelected())
+
+    if (selectedRows.length === 0) {
       alert('Please select items to download')
       return
     }
 
-    if (!folderPath) {
+    let currentFolderPath = folderPath
+    if (!currentFolderPath) {
       const defaultPath = await window.api.selectFolder()
       if (!defaultPath) return
-      setFolderPath(defaultPath)
+      currentFolderPath = defaultPath
+      setFolderPath(currentFolderPath)
     }
 
     setDownloading(true)
     isCancelDownloadRef.current = false
-    setDownloadProgress({ current: 0, total: selectedIndices.length })
+    setDownloadProgress({ current: 0, total: selectedRows.length })
 
-    const selectedItems = selectedIndices.map((i) => posts[parseInt(i)])
-    const targetFolder = folderPath || (await window.api.selectFolder()) || ''
+    // Create username subfolder path (We assume Main process handles simple path joining if we pass it,
+    // but here we are constructing strings. Windows uses \, others /.
+    // Ideally we should use IPC to join paths, but simpler here: use template literal with forward slash which works mostly in node/electron)
+    // Actually, passing "C:/Users/Downloads/tiktok/username" works on Windows.
+    // Username might have invalid chars.
+    const safeUsername = sanitizeFilename(userInfo?.uniqueId || username || 'unknown_user')
+    // Using string concat for path - be careful with separators.
+    // Ideally, pass base folder + username to downloadFile? No, downloadFile takes absolute folderPath.
+    // Let's assume standard slash works or simple append.
+    // Proper way: use a small utility or regex to handle separator.
+    // Or just append `/${safeUsername}`.
+    const userFolderPath = `${currentFolderPath}/${safeUsername}`
 
-    if (!targetFolder) {
-      setDownloading(false)
-      return
-    }
-
-    for (let i = 0; i < selectedItems.length; i++) {
+    // Note: The loop index 'i' here represents the "Numerical Order" because we are iterating selected rows in their sorted order.
+    for (let i = 0; i < selectedRows.length; i++) {
       if (isCancelDownloadRef.current) break
 
-      const item = selectedItems[i]
+      const row = selectedRows[i]
+      const item = row.original
       const indexForName = i
       const delayMs = parseInt(delay) || 0
 
@@ -301,14 +315,18 @@ const BulkDownloader = () => {
           await window.api.downloadFile({
             url: item.video.mp4Uri,
             fileName: getFilename(item, indexForName, 'mp4'),
-            folderPath: targetFolder
+            folderPath: userFolderPath
           })
         } else if (item.type === 'PHOTO' && item.imagesUri) {
+          // For photos: Create a subfolder with the calculated filename (minus extension)
+          const baseName = getFilename(item, indexForName, 'jpg').replace('.jpg', '')
+          const photoFolderPath = `${userFolderPath}/${baseName}`
+
           for (let j = 0; j < item.imagesUri.length; j++) {
             await window.api.downloadFile({
               url: item.imagesUri[j],
-              fileName: getFilename(item, indexForName, `jpg`).replace('.jpg', `_${j + 1}.jpg`),
-              folderPath: targetFolder
+              fileName: `${j + 1}.jpg`,
+              folderPath: photoFolderPath
             })
           }
         }
@@ -319,7 +337,13 @@ const BulkDownloader = () => {
       setDownloadProgress((prev) => ({ ...prev, current: prev.current + 1 }))
       if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs))
     }
+
     setDownloading(false)
+  }
+
+  const handleSelectFolder = async () => {
+    const path = await window.api.selectFolder()
+    if (path) setFolderPath(path)
   }
 
   return (

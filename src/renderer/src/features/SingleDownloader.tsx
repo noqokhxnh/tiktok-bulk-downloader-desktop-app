@@ -1,14 +1,31 @@
-import { Button, Input, Select, SelectItem, Card, CardBody, Image, Chip } from '@heroui/react'
-import { useState } from 'react'
+import {
+  Button,
+  Input,
+  Select,
+  SelectItem,
+  Card,
+  CardBody,
+  Image,
+  Chip,
+  Tooltip
+} from '@heroui/react'
+import { useState, useEffect } from 'react'
 import { FolderOpen, Download, Search } from 'lucide-react'
 import { IAwemeItem } from '@shared/types/tiktok.type'
 
 const SingleDownloader = () => {
   const [postId, setPostId] = useState('')
   const [folderPath, setFolderPath] = useState('')
-  const [fileNameFormat, setFileNameFormat] = useState('ID')
+  // Using Set for multi-select consistent with Bulk
+  const [fileNameFormat, setFileNameFormat] = useState<Set<string>>(new Set(['ID']))
   const [loading, setLoading] = useState(false)
   const [downloadedItem, setDownloadedItem] = useState<IAwemeItem | null>(null)
+
+  useEffect(() => {
+    window.api.getDefaultDownloadPath().then((path) => {
+      if (path) setFolderPath(path)
+    })
+  }, [])
 
   const handleSelectFolder = async () => {
     const path = await window.api.selectFolder()
@@ -19,20 +36,17 @@ const SingleDownloader = () => {
     return name ? name.replace(/[^a-z0-9]/gi, '_').substring(0, 50) : 'no_desc'
   }
 
-  const getFilename = (item: IAwemeItem, _index: number, ext: string) => {
+  const getFilename = (item: IAwemeItem, index: number, ext: string) => {
     const date = new Date(item.createdAt * 1000).toISOString().split('T')[0]
-    switch (fileNameFormat) {
-      case 'Numerical order_ID':
-        return `${item.id}.${ext}` // Single item doesn't have order really, just ID
-      case 'ID':
-        return `${item.id}.${ext}`
-      case 'Description':
-        return `${sanitizeFilename(item.description)}.${ext}`
-      case 'Timestamp':
-        return `${date}_${item.id}.${ext}`
-      default:
-        return `${item.id}.${ext}`
-    }
+    const formatKeys = Array.from(fileNameFormat)
+    const parts: string[] = []
+
+    if (formatKeys.includes('Numerical order')) parts.push(`${index + 1}`) // Often irrelevant for single, but allowed
+    if (formatKeys.includes('ID')) parts.push(item.id)
+    if (formatKeys.includes('Timestamp')) parts.push(date)
+    if (formatKeys.includes('Description')) parts.push(sanitizeFilename(item.description))
+
+    return parts.length > 0 ? `${parts.join('_')}.${ext}` : `${item.id}.${ext}`
   }
 
   const handleDownload = async () => {
@@ -40,10 +54,7 @@ const SingleDownloader = () => {
     setLoading(true)
     setDownloadedItem(null)
     try {
-      // 1. Get Credentials
       const creds = await window.api.getCredentials()
-
-      // 2. Get Details
       const item = await window.api.getAwemeDetails(postId, { cookie: creds.cookie })
 
       if (!item) {
@@ -52,13 +63,15 @@ const SingleDownloader = () => {
         return
       }
 
-      // 3. Download
-      const targetFolder = folderPath || (await window.api.selectFolder())
+      let targetFolder = folderPath
       if (!targetFolder) {
-        setLoading(false)
-        return
+        targetFolder = (await window.api.selectFolder()) || ''
+        if (!targetFolder) {
+          setLoading(false)
+          return
+        }
+        setFolderPath(targetFolder)
       }
-      setFolderPath(targetFolder)
 
       if (item.type === 'VIDEO' && item.video) {
         await window.api.downloadFile({
@@ -67,17 +80,21 @@ const SingleDownloader = () => {
           folderPath: targetFolder
         })
       } else if (item.type === 'PHOTO' && item.imagesUri) {
+        // Create a folder for the photos
+        const baseName = getFilename(item, 0, 'jpg').replace('.jpg', '')
+        const photoFolderPath = `${targetFolder}/${baseName}`
+
         for (let j = 0; j < item.imagesUri.length; j++) {
           await window.api.downloadFile({
             url: item.imagesUri[j],
-            fileName: getFilename(item, 0, `jpg`).replace('.jpg', `_${j + 1}.jpg`),
-            folderPath: targetFolder
+            fileName: `${j + 1}.jpg`,
+            folderPath: photoFolderPath
           })
         }
       }
 
       setDownloadedItem(item)
-      alert('Download Successful!')
+      // alert('Download Successful!')
     } catch (e) {
       console.error(e)
       alert('Download failed: ' + e)
@@ -106,28 +123,46 @@ const SingleDownloader = () => {
           startContent={<Search className="text-default-400" />}
         />
 
-        <div className="flex gap-4">
-          <Input
-            label="Save Location"
-            value={folderPath}
-            readOnly
-            placeholder="Default: Downloads"
-            className="flex-1"
-            variant="bordered"
-            endContent={
-              <FolderOpen
-                className="text-default-400 cursor-pointer hover:text-primary"
-                onClick={handleSelectFolder}
+        <div className="flex flex-col gap-4">
+          <div className="flex gap-4">
+            <Tooltip delay={0} content={folderPath} placement="top" isDisabled={!folderPath}>
+              <Input
+                label="Save Location"
+                value={folderPath}
+                readOnly
+                placeholder="Default: Downloads"
+                className="flex-1"
+                variant="bordered"
+                endContent={
+                  <FolderOpen
+                    className="text-default-400 cursor-pointer hover:text-primary"
+                    onClick={handleSelectFolder}
+                  />
+                }
               />
-            }
-          />
+            </Tooltip>
+          </div>
+
           <Select
             label="Filename Format"
-            className="w-48"
-            defaultSelectedKeys={['ID']}
-            onSelectionChange={(keys) => setFileNameFormat(Array.from(keys)[0] as string)}
+            selectionMode="multiple"
+            selectedKeys={fileNameFormat}
+            onSelectionChange={(keys) => setFileNameFormat(keys as Set<string>)}
             variant="bordered"
+            renderValue={(items) => (
+              <div className="flex flex-wrap items-center gap-1">
+                {items.map((item, index) => (
+                  <div key={item.key} className="flex items-center gap-1">
+                    <Chip size="sm" variant="flat" color="primary">
+                      {item.textValue}
+                    </Chip>
+                    {index < items.length - 1 && <span className="text-default-400">_</span>}
+                  </div>
+                ))}
+              </div>
+            )}
           >
+            <SelectItem key="Numerical order">Numerical Order</SelectItem>
             <SelectItem key="ID">ID</SelectItem>
             <SelectItem key="Description">Description</SelectItem>
             <SelectItem key="Timestamp">Timestamp</SelectItem>

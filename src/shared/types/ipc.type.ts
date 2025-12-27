@@ -27,4 +27,5 @@ export interface IpcApi {
   getCredentials: () => Promise<ITiktokCredentials>
   selectFolder: () => Promise<string | null>
   downloadFile: (options: IDownloadFileOptions) => Promise<boolean>
+  getDefaultDownloadPath: () => Promise<string>
 }

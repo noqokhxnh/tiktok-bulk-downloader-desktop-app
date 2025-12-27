@@ -11,7 +11,7 @@ import {
   IUserInfo,
   ITiktokCredentials
 } from '@shared/types/tiktok.type'
-import { ipcMain, dialog } from 'electron'
+import { ipcMain, dialog, app } from 'electron'
 import fs from 'fs'
 import path from 'path'
 import axios from 'axios'
@@ -62,6 +62,9 @@ const setupIpcHandlers = () => {
     async (_event, options: IDownloadFileOptions): Promise<boolean> => {
       try {
         const { url, fileName, folderPath } = options
+        if (!fs.existsSync(folderPath)) {
+          fs.mkdirSync(folderPath, { recursive: true })
+        }
         const filePath = path.join(folderPath, fileName)
 
         const response = await axios.get(url, { responseType: 'stream' })
@@ -75,6 +78,10 @@ const setupIpcHandlers = () => {
       }
     }
   )
+
+  ipcMain.handle(IPC_CHANNELS.GET_DEFAULT_DOWNLOAD_PATH, async (): Promise<string> => {
+    return app.getPath('downloads')
+  })
 }
 
 export default setupIpcHandlers
