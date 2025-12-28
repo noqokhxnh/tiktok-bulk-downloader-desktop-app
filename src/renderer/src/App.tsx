@@ -13,6 +13,7 @@ export default function App() {
           <div className="flex w-full flex-col h-[calc(100vh-140px)]">
             <Tabs
               aria-label="Features"
+              destroyInactiveTabPanel={false}
               color="primary"
               variant="underlined"
               classNames={{

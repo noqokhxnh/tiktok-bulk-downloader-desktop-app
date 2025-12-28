@@ -7,8 +7,14 @@ import {
   Progress,
   Tooltip,
   Pagination,
-  Checkbox,
-  cn
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+  SortDescriptor,
+  Selection
 } from '@heroui/react'
 import {
   SortingState,
@@ -19,20 +25,12 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-  FilterFn
+  FilterFn,
+  RowSelectionState
 } from '@tanstack/react-table'
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { IAwemeItem, IUserInfo } from '@shared/types/tiktok.type'
-import {
-  Search,
-  Download,
-  FolderOpen,
-  StopCircle,
-  ExternalLink,
-  ArrowUp,
-  ArrowDown,
-  ArrowDownUp
-} from 'lucide-react'
+import { Search, Download, FolderOpen, StopCircle, ExternalLink } from 'lucide-react'
 
 const columnHelper = createColumnHelper<IAwemeItem>()
 
@@ -49,7 +47,7 @@ const BulkDownloader = () => {
   const isCancelDownloadRef = useRef(false)
 
   // Table State
-  const [rowSelection, setRowSelection] = useState({})
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<{ id: string; value: unknown }[]>([])
 
@@ -75,7 +73,9 @@ const BulkDownloader = () => {
 
   const columns = useMemo(
     () => [
+      // Removed manual checkbox column as HeroUI handles it
       columnHelper.accessor('id', {
+        id: 'id',
         header: 'ID',
         // Enable column filtering
         filterFn: customFilterFn,
@@ -83,6 +83,7 @@ const BulkDownloader = () => {
         cell: (info) => <span className="text-small font-bold">{info.getValue()}</span>
       }),
       columnHelper.accessor('type', {
+        id: 'type',
         header: 'Type',
         filterFn: (row, id, value) => {
           return !value || value === 'ALL' || row.getValue(id) === value
@@ -99,6 +100,7 @@ const BulkDownloader = () => {
         )
       }),
       columnHelper.accessor('url', {
+        id: 'url',
         header: 'Url',
         enableSorting: false,
         cell: (info) => (
@@ -113,6 +115,7 @@ const BulkDownloader = () => {
         )
       }),
       columnHelper.accessor('description', {
+        id: 'description',
         header: 'Description',
         filterFn: customFilterFn,
         enableSorting: false,
@@ -123,7 +126,9 @@ const BulkDownloader = () => {
         )
       }),
       columnHelper.accessor('createdAt', {
+        id: 'createdAt',
         header: 'Created At',
+        enableSorting: true,
         cell: (info) => (
           <span className="text-tiny text-default-500">
             {info.getValue() ? new Date(info.getValue() * 1000).toLocaleString() : '-'}
@@ -131,25 +136,33 @@ const BulkDownloader = () => {
         )
       }),
       columnHelper.accessor('stats.likes', {
+        id: 'likes',
         header: 'Likes',
+        enableSorting: true,
         cell: (info) => (
           <span className="text-tiny">❤️ {Number(info.getValue()).toLocaleString()}</span>
         )
       }),
       columnHelper.accessor('stats.comments', {
+        id: 'comments',
         header: 'Comments',
+        enableSorting: true,
         cell: (info) => (
           <span className="text-tiny">💬 {Number(info.getValue()).toLocaleString()}</span>
         )
       }),
       columnHelper.accessor('stats.views', {
+        id: 'views',
         header: 'Views',
+        enableSorting: true,
         cell: (info) => (
           <span className="text-tiny">👁️ {Number(info.getValue()).toLocaleString()}</span>
         )
       }),
       columnHelper.accessor('stats.collects', {
+        id: 'collects',
         header: 'Collects',
+        enableSorting: true,
         cell: (info) => (
           <span className="text-tiny">📌 {Number(info.getValue()).toLocaleString()}</span>
         )
@@ -161,6 +174,7 @@ const BulkDownloader = () => {
   const table = useReactTable({
     data: posts,
     columns,
+    getRowId: (row) => row.id, // Important for selection
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -189,6 +203,49 @@ const BulkDownloader = () => {
     },
     enableRowSelection: true
   })
+
+  // HeroUI Table Interop
+  const sortDescriptor = useMemo<SortDescriptor | undefined>(() => {
+    if (sorting.length === 0) return undefined
+    return {
+      column: sorting[0].id,
+      direction: sorting[0].desc ? 'descending' : 'ascending'
+    }
+  }, [sorting])
+
+  const handleSortChange = (descriptor: SortDescriptor) => {
+    if (descriptor.column) {
+      setSorting([
+        {
+          id: descriptor.column as string,
+          desc: descriptor.direction === 'descending'
+        }
+      ])
+    } else {
+      setSorting([])
+    }
+  }
+
+  const selectedKeys = useMemo<Selection>(() => {
+    if (table.getIsAllRowsSelected()) return 'all'
+    const keys = Object.keys(rowSelection).filter((key) => rowSelection[key])
+    if (keys.length === 0) return new Set([])
+    return new Set(keys)
+  }, [rowSelection, table])
+
+  const handleSelectionChange = (keys: Selection) => {
+    if (keys === 'all') {
+      table.toggleAllRowsSelected(true)
+    } else {
+      // If we switched from all to some, or just some to some
+      // When keys is a Set, it contains the selected row IDs
+      const newSelection = {}
+      keys.forEach((key) => {
+        newSelection[key] = true
+      })
+      setRowSelection(newSelection)
+    }
+  }
 
   // Fetch Logic
   const handleFetchData = async () => {
@@ -296,17 +353,7 @@ const BulkDownloader = () => {
     isCancelDownloadRef.current = false
     setDownloadProgress({ current: 0, total: selectedRows.length })
 
-    // Create username subfolder path (We assume Main process handles simple path joining if we pass it,
-    // but here we are constructing strings. Windows uses \, others /.
-    // Ideally we should use IPC to join paths, but simpler here: use template literal with forward slash which works mostly in node/electron)
-    // Actually, passing "C:/Users/Downloads/tiktok/username" works on Windows.
-    // Username might have invalid chars.
     const safeUsername = sanitizeFilename(userInfo?.uniqueId || username || 'unknown_user')
-    // Using string concat for path - be careful with separators.
-    // Ideally, pass base folder + username to downloadFile? No, downloadFile takes absolute folderPath.
-    // Let's assume standard slash works or simple append.
-    // Proper way: use a small utility or regex to handle separator.
-    // Or just append `/${safeUsername}`.
     const userFolderPath = `${currentFolderPath}/${safeUsername}`
 
     // Batch processing
@@ -356,69 +403,20 @@ const BulkDownloader = () => {
     setDownloading(false)
   }
 
+  const handleStopDownload = () => {
+    isCancelDownloadRef.current = true
+    setDownloading(false)
+  }
+
   const handleSelectFolder = async () => {
     const path = await window.api.selectFolder()
     if (path) setFolderPath(path)
   }
 
-  return (
-    <div className="flex flex-col gap-4 h-full relative p-2">
-      {/* Input Section */}
-      <div className="flex gap-4 items-end bg-content1 p-4 rounded-lg shadow-sm border border-divider">
-        <Input
-          label="Username"
-          value={username}
-          onValueChange={setUsername}
-          className="max-w-xs"
-          variant="bordered"
-          size="sm"
-          isDisabled={loading}
-        />
-        <Input
-          label="Delay between fetching posts (ms)"
-          value={delay}
-          onValueChange={setDelay}
-          className="grow w-fit"
-          type="number"
-          variant="bordered"
-          size="sm"
-          isDisabled={loading}
-          placeholder="0"
-        />
-        <Input
-          label="Batch size per download"
-          value={batchSize}
-          onValueChange={setBatchSize}
-          className="grow w-fit"
-          type="number"
-          variant="bordered"
-          size="sm"
-          isDisabled={loading}
-          placeholder="10"
-        />
-        <Button
-          color={loading ? 'danger' : 'primary'}
-          onPress={handleFetchData}
-          startContent={!loading ? <Search size={18} /> : <StopCircle size={18} />}
-        >
-          {loading ? 'Stop Fetching' : 'Get Data'}
-        </Button>
-        <div className="ml-auto text-small text-default-500 flex items-center h-full">
-          {userInfo && (
-            <div className="flex gap-4">
-              <span>
-                <b>@{userInfo.uniqueId}</b>
-              </span>
-              <span>Posts: {posts.length}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-hidden flex flex-col gap-4">
-        {/* Toolbar with Filters */}
-        <div className="flex justify-between items-center bg-content1 p-2 rounded-lg border border-divider flex-wrap gap-2">
+  const renderTopContent = useCallback(() => {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex justify-between items-center p-2 rounded-lg border border-divider flex-wrap gap-2">
           <div className="flex gap-2 items-center flex-1">
             {/* ID Search Filter */}
             <Input
@@ -485,7 +483,7 @@ const BulkDownloader = () => {
                 <div className="flex flex-wrap items-center gap-1">
                   {items.map((item, index) => (
                     <div key={item.key} className="flex items-center gap-1">
-                      <Chip size="sm" variant="flat" color="success">
+                      <Chip size="sm" variant="flat" color="primary">
                         {item.textValue}
                       </Chip>
 
@@ -504,8 +502,8 @@ const BulkDownloader = () => {
 
             <Button
               size="sm"
-              color={downloading ? 'danger' : 'success'}
-              onPress={downloading ? () => (isCancelDownloadRef.current = true) : handleDownload}
+              color={downloading ? 'danger' : 'primary'}
+              onPress={downloading ? handleStopDownload : handleDownload}
               startContent={downloading ? <StopCircle size={16} /> : <Download size={16} />}
               isDisabled={Object.keys(rowSelection).length === 0}
             >
@@ -513,7 +511,6 @@ const BulkDownloader = () => {
             </Button>
           </div>
         </div>
-
         {downloading && (
           <div className="w-full px-1">
             <div className="flex justify-between text-tiny mb-1">
@@ -530,118 +527,147 @@ const BulkDownloader = () => {
             />
           </div>
         )}
+      </div>
+    )
+  }, [table, folderPath, fileNameFormat, downloading, downloadProgress, rowSelection, columns])
 
-        {/* Table */}
-        <div className="flex-1 overflow-auto border rounded-lg border-divider custom-scrollbar relative bg-content1/50">
-          <table className="min-w-full text-left text-sm w-full">
-            <thead className="bg-default-100 sticky top-0 z-20 shadow-sm">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
-                  <th className="p-3 w-10 bg-default-100">
-                    <Checkbox
-                      disabled={downloading}
-                      size="sm"
-                      isIndeterminate={table.getIsSomeRowsSelected()}
-                      isSelected={table.getIsAllRowsSelected()}
-                      onChange={table.getToggleAllRowsSelectedHandler()}
-                      classNames={{
-                        wrapper: 'before:border-default-400'
-                      }}
-                    />
-                  </th>
-                  {headerGroup.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      className={cn(
-                        'p-3 font-semibold text-default-600 transition-colors bg-default-100 whitespace-nowrap',
-                        header.column.getCanSort()
-                          ? 'cursor-pointer hover:text-primary'
-                          : 'cursor-default'
-                      )}
-                      onClick={header.column.getToggleSortingHandler()}
-                    >
-                      <div className="flex items-center gap-1">
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {header.column.getCanSort() &&
-                          ({ asc: <ArrowUp size={15} />, desc: <ArrowDown size={15} /> }[
-                            header.column.getIsSorted() as string
-                          ] ?? <ArrowDownUp size={15} />)}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody className="divide-y divide-divider">
-              {table.getRowModel().rows.length > 0 ? (
-                table.getRowModel().rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className={cn(
-                      'transition-colors group',
-                      row.getIsSelected()
-                        ? 'bg-primary-50 dark:bg-primary-100/60'
-                        : 'hover:bg-default-100'
-                    )}
-                  >
-                    <td className="p-3">
-                      <Checkbox
-                        disabled={downloading}
-                        size="sm"
-                        isSelected={row.getIsSelected()}
-                        onChange={row.getToggleSelectedHandler()}
-                        classNames={{
-                          wrapper: 'before:border-default-400'
-                        }}
-                      />
-                    </td>
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="p-3">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={columns.length + 1} className="p-10 text-center text-default-500">
-                    {loading && posts.length === 0
-                      ? 'Fetching user info and posts...'
-                      : 'No data found. Enter a username to fetch.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+  const renderBottomContent = useCallback(() => {
+    return (
+      <div className="flex justify-between items-center p-2 rounded-lg border border-divider">
+        <div className="text-small text-default-500">Total {posts.length} items</div>
+
+        <Pagination
+          showControls
+          total={table.getPageCount()}
+          initialPage={1}
+          page={pageIndex + 1}
+          onChange={(page) => setPageIndex(page - 1)}
+          siblings={1}
+          boundaries={1}
+        />
+
+        <Select
+          size="sm"
+          className="w-24"
+          selectedKeys={[String(pageSize)]}
+          onChange={(e) => setPageSize(Number(e.target.value))}
+          aria-label="Rows per page"
+        >
+          <SelectItem key="10">10 / page</SelectItem>
+          <SelectItem key="20">20 / page</SelectItem>
+          <SelectItem key="50">50 / page</SelectItem>
+          <SelectItem key="100">100 / page</SelectItem>
+        </Select>
+      </div>
+    )
+  }, [posts.length, table, pageIndex, pageSize])
+
+  return (
+    <div className="flex flex-col gap-4 h-full relative p-2">
+      {/* Input Section */}
+      <div className="flex gap-4 items-end bg-content1 p-4 rounded-lg shadow-sm border border-divider">
+        <Input
+          label="Username"
+          value={username}
+          onValueChange={setUsername}
+          className="max-w-xs"
+          variant="bordered"
+          size="sm"
+          isDisabled={loading}
+        />
+        <Input
+          label="Delay between fetching posts (ms)"
+          value={delay}
+          onValueChange={setDelay}
+          className="grow w-fit"
+          type="number"
+          variant="bordered"
+          size="sm"
+          isDisabled={loading}
+          placeholder="0"
+        />
+        <Input
+          label="Batch size per download"
+          value={batchSize}
+          onValueChange={setBatchSize}
+          className="grow w-fit"
+          type="number"
+          variant="bordered"
+          size="sm"
+          isDisabled={loading}
+          placeholder="10"
+        />
+        <Button
+          color={loading ? 'danger' : 'primary'}
+          onPress={handleFetchData}
+          startContent={!loading ? <Search size={18} /> : <StopCircle size={18} />}
+        >
+          {loading ? 'Stop Fetching' : 'Get Data'}
+        </Button>
+        <div className="ml-auto text-small text-default-500 flex items-center h-full">
+          {userInfo && (
+            <div className="flex gap-4">
+              <span>
+                <b>@{userInfo.uniqueId}</b>
+              </span>
+              <span>Posts: {posts.length}</span>
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* Pagination */}
-        <div className="flex justify-between items-center p-2 bg-content1 rounded-lg border border-divider">
-          <div className="text-small text-default-500">Total {posts.length} items</div>
-
-          <Pagination
-            showControls
-            total={table.getPageCount()}
-            initialPage={1}
-            page={pageIndex + 1}
-            onChange={(page) => setPageIndex(page - 1)}
-            siblings={1}
-            boundaries={1}
-          />
-
-          <Select
-            size="sm"
-            className="w-24"
-            selectedKeys={[String(pageSize)]}
-            onChange={(e) => setPageSize(Number(e.target.value))}
-            aria-label="Rows per page"
+      {/* Main Content: HeroUI Table */}
+      <div className="flex gap-4 h-full overflow-hidden">
+        <Table
+          aria-label="Bulk Downloader Table"
+          isHeaderSticky
+          bottomContent={renderBottomContent()}
+          bottomContentPlacement="outside"
+          topContent={renderTopContent()}
+          topContentPlacement="outside"
+          classNames={{
+            wrapper: 'h-full',
+            base: 'h-full overflow-hidden'
+          }}
+          selectionMode="multiple"
+          selectedKeys={selectedKeys}
+          onSelectionChange={handleSelectionChange}
+          sortDescriptor={sortDescriptor}
+          onSortChange={handleSortChange}
+        >
+          <TableHeader columns={columns}>
+            {(column) => (
+              <TableColumn
+                key={column.id}
+                align={column.id === 'actions' ? 'end' : 'start'}
+                allowsSorting={column.enableSorting}
+              >
+                {column.header as string}
+              </TableColumn>
+            )}
+          </TableHeader>
+          <TableBody
+            items={table.getRowModel().rows}
+            emptyContent={loading ? 'Fetching...' : 'No data found'}
           >
-            <SelectItem key="10">10 / page</SelectItem>
-            <SelectItem key="20">20 / page</SelectItem>
-            <SelectItem key="50">50 / page</SelectItem>
-            <SelectItem key="100">100 / page</SelectItem>
-          </Select>
-        </div>
+            {(row) => (
+              <TableRow key={row.original.id}>
+                {(columnKey) => (
+                  <TableCell>
+                    {flexRender(
+                      row.getVisibleCells().find((cell) => cell.column.id === columnKey)?.column
+                        .columnDef.cell,
+                      row
+                        .getVisibleCells()
+                        .find((cell) => cell.column.id === columnKey)
+                        ?.getContext()!
+                    )}
+                  </TableCell>
+                )}
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   )

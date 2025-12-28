@@ -1,5 +1,8 @@
-appId: com.electron.app
-productName: electron-app
+appId: com.minhchi.tiktokbulkdownloader
+productName: Tiktok Bulk Downloader
+electronFuses:
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
 directories:
   buildResources: build
 files:
@@ -12,14 +15,19 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: electron-app
+  executableName: Tiktok Bulk Downloader
+  icon: resources/icon.png
+  target: nsis
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: true
 mac:
-  entitlementsInherit: build/entitlements.mac.plist
+  # entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
     - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
@@ -33,7 +41,7 @@ linux:
     - AppImage
     - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: Minh Chi
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}

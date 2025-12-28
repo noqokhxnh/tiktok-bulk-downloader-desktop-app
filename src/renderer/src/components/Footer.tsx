@@ -1,5 +1,5 @@
 import { Link } from '@heroui/react'
-import { Facebook, Github } from 'lucide-react'
+import { FacebookLogoIcon, GithubLogoIcon } from '@renderer/assets/icons'
 
 const Footer = () => {
   return (
@@ -8,19 +8,15 @@ const Footer = () => {
         Created by <span className="font-semibold text-primary">@minhchi1509</span>
       </div>
       <div className="flex items-center gap-4 mt-2 md:mt-0">
-        <Link
-          isExternal
-          href="https://www.facebook.com/minhchi1509"
-          className="text-default-500 hover:text-blue-600 transition-colors"
-        >
-          <Facebook size={20} />
+        <Link isExternal href="https://www.facebook.com/minhchi1509">
+          <FacebookLogoIcon width={20} height={20} />
         </Link>
         <Link
           isExternal
           href="https://github.com/minhchi1509"
-          className="text-default-500 hover:text-black dark:hover:text-white transition-colors"
+          className="text-black dark:text-white hover:text-black/80 dark:hover:text-white/80"
         >
-          <Github size={20} />
+          <GithubLogoIcon width={20} height={20} />
         </Link>
       </div>
     </footer>

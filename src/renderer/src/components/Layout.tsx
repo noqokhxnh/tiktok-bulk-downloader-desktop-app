@@ -20,7 +20,7 @@ const Layout = ({ children }: LayoutProps) => {
       <header className="sticky top-0 z-50 w-full border-b border-divider bg-background/60 backdrop-blur-md px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="app-drag w-full h-full absolute top-0 left-0 z-0 pointer-events-none" />
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-green-500 to-teal-500 z-10">
+          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-blue-500 to-cyan-500 z-10">
             Tiktok Bulk Downloader
           </h1>
         </div>
