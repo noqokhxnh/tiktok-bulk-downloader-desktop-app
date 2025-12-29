@@ -59,8 +59,9 @@ const SingleDownloader = () => {
     setLoading(true)
     setDownloadedItem(null)
     try {
-      const creds = await window.api.getCredentials()
-      const item = await window.api.getAwemeDetails(postId, { cookie: creds.cookie })
+      const item = await window.api.getAwemeDetails(postId, {
+        cookie: import.meta.env.RENDERER_VITE_TIKTOK_COOKIE
+      })
 
       if (!item) {
         alert('Could not find video with that ID')

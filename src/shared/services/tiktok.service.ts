@@ -3,12 +3,7 @@ import createMobileHeadersSignature, {
   getBaseMobileParams
 } from '@shared/tiktok-signer/signHeadersMobile'
 import { IpcGetAwemeListOptions, IpcGetAwemeDetailsOptions } from '@shared/types/ipc.type'
-import {
-  IUserInfo,
-  IAwemeListResponse,
-  IAwemeItem,
-  ITiktokCredentials
-} from '@shared/types/tiktok.type'
+import { IUserInfo, IAwemeListResponse, IAwemeItem } from '@shared/types/tiktok.type'
 import tiktokUtils from '@shared/utils/tiktok.util'
 import axios from 'axios'
 import qs from 'qs'
@@ -179,20 +174,10 @@ const getAwemeDetails = async (
   }
 }
 
-const getCredentials = async (): Promise<ITiktokCredentials> => {
-  try {
-    const { data } = await axios.get(TIKTOK_API_URL.GET_TIKTOK_CREDENTIALS)
-    return data as ITiktokCredentials
-  } catch (error) {
-    throw new Error('❌ Failed to get TikTok credentials: ' + (error as Error).stack?.toString())
-  }
-}
-
 const TiktokService = {
   getUserInfo,
   getUserAwemeList,
-  getAwemeDetails,
-  getCredentials
+  getAwemeDetails
 }
 
 export default TiktokService

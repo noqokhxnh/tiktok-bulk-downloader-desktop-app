@@ -10,7 +10,14 @@ import {
   useDisclosure
 } from '@heroui/react'
 
-type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error'
+type UpdateStatus =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'downloading'
+  | 'ready'
+  | 'error'
+  | 'not-available'
 
 const UpdaterHandler = () => {
   const { isOpen, onOpen, onOpenChange, onClose } = useDisclosure()
@@ -51,13 +58,9 @@ const UpdaterHandler = () => {
     })
 
     const removeNotAvailable = window.api.onUpdateNotAvailable(() => {
-      setStatus('idle')
-      // Show "No updates available" toast if it was a manual check?
-      // For now we can just log it.
-      // Ideally we'd know if it was manual to show a feedback.
-      // But basic implementation: just log.
+      setStatus('not-available')
       console.log('Update not available')
-      alert('No updates available') // Simple alert for now for manual check feedback
+      onOpen()
     })
 
     return () => {
@@ -128,6 +131,22 @@ const UpdaterHandler = () => {
             </Button>
             <Button color="primary" onPress={handleInstall}>
               Restart & Install
+            </Button>
+          </ModalFooter>
+        </>
+      )
+    }
+
+    if (status === 'not-available') {
+      return (
+        <>
+          <ModalHeader className="flex flex-col gap-1">No Updates Available</ModalHeader>
+          <ModalBody>
+            <p>You are using the latest version.</p>
+          </ModalBody>
+          <ModalFooter>
+            <Button color="primary" onPress={onClose}>
+              OK
             </Button>
           </ModalFooter>
         </>

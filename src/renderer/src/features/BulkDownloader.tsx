@@ -266,7 +266,6 @@ const BulkDownloader = () => {
     setPageIndex(0)
 
     try {
-      const creds = await window.api.getCredentials()
       const user = await window.api.getUserInfo(username)
       setUserInfo(user)
 
@@ -278,7 +277,7 @@ const BulkDownloader = () => {
         const res = await window.api.getUserAwemeList(user.secUid, {
           cursor: currentCursor,
           maxCursor: currentMaxCursor,
-          cookie: creds.cookie
+          cookie: import.meta.env.RENDERER_VITE_TIKTOK_COOKIE
         })
 
         setPosts((prev) => [...prev, ...res.awemeList])
@@ -626,7 +625,7 @@ const BulkDownloader = () => {
           topContent={renderTopContent()}
           topContentPlacement="outside"
           classNames={{
-            wrapper: 'h-full',
+            wrapper: 'h-full shadow-sm border border-divider',
             base: 'h-full overflow-hidden'
           }}
           selectionMode="multiple"

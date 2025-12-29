@@ -14,9 +14,6 @@ const api: IpcApi = {
   getAwemeDetails: (awemeId, options) => {
     return ipcRenderer.invoke(IPC_CHANNELS.GET_AWEME_DETAILS, awemeId, options)
   },
-  getCredentials: () => {
-    return ipcRenderer.invoke(IPC_CHANNELS.GET_TIKTOK_CREDENTIALS)
-  },
   selectFolder: () => {
     return ipcRenderer.invoke(IPC_CHANNELS.SELECT_FOLDER)
   },

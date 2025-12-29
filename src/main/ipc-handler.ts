@@ -5,12 +5,7 @@ import {
   IpcGetAwemeDetailsOptions,
   IpcGetAwemeListOptions
 } from '@shared/types/ipc.type'
-import {
-  IAwemeItem,
-  IAwemeListResponse,
-  IUserInfo,
-  ITiktokCredentials
-} from '@shared/types/tiktok.type'
+import { IAwemeItem, IAwemeListResponse, IUserInfo } from '@shared/types/tiktok.type'
 import { ipcMain, dialog, app, BrowserWindow } from 'electron'
 import fs from 'fs'
 import path from 'path'
@@ -50,10 +45,6 @@ const setupIpcHandlers = ({ mainWindow }: ISetupIpcHandlersOptions) => {
       return TiktokService.getAwemeDetails(awemeId, options)
     }
   )
-
-  ipcMain.handle(IPC_CHANNELS.GET_TIKTOK_CREDENTIALS, async (): Promise<ITiktokCredentials> => {
-    return TiktokService.getCredentials()
-  })
 
   ipcMain.handle(IPC_CHANNELS.SELECT_FOLDER, async (): Promise<string | null> => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
