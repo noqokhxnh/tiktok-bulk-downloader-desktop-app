@@ -2,8 +2,9 @@ import { ReactNode } from 'react'
 import Footer from './Footer'
 import UpdaterHandler from './UpdaterHandler'
 import { Button, Tooltip } from '@heroui/react'
-import { Moon, Sun, RotateCw } from 'lucide-react'
+import { Moon, Sun, RotateCw, Heart } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { Link } from 'react-router-dom'
 
 interface LayoutProps {
   children: ReactNode
@@ -27,6 +28,18 @@ const Layout = ({ children }: LayoutProps) => {
         </div>
 
         <div className="flex items-center gap-2 z-10 app-no-drag">
+          <Tooltip content="Support Me">
+            <Button
+              as={Link}
+              to="/donate"
+              isIconOnly
+              variant="light"
+              aria-label="Support Me"
+              className="text-danger"
+            >
+              <Heart size={20} />
+            </Button>
+          </Tooltip>
           <Tooltip content="Check for Updates">
             <Button
               isIconOnly

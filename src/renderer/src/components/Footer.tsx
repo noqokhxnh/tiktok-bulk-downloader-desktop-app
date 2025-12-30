@@ -13,7 +13,7 @@ const Footer = () => {
         </Link>
         <Link
           isExternal
-          href="https://github.com/minhchi1509"
+          href="https://github.com/minhchi1509/tiktok-bulk-downloader-desktop-app"
           className="text-black dark:text-white hover:text-black/80 dark:hover:text-white/80"
         >
           <GithubLogoIcon width={20} height={20} />
