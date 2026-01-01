@@ -326,11 +326,11 @@ const BulkDownloader = () => {
   }
 
   // Fetch default path on mount
-  useState(() => {
+  useEffect(() => {
     window.api.getDefaultDownloadPath().then(({ data: path }) => {
       if (path) setFolderPath(path)
     })
-  })
+  }, [])
 
   // Download Logic
   const sanitizeFilename = (name: string) => {
